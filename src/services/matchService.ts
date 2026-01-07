@@ -9,9 +9,6 @@ import {
 import { db } from "./firebase";
 import { Match } from "../types/match";
 
-/* =======================
-   LIST MATCHES
-======================= */
 export function listenMatches(
   callback: (matches: Match[]) => void
 ) {
