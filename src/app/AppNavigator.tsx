@@ -1,8 +1,8 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import MatchListScreen from "../screens/MatchListScreen";
-import SelectInitialServeScreen from "../screens/SelectInitialServeScreen";
-import ScoreBoardScreen from "../screens/ScoreBoardScreen";
-import CreateMatchScreen from "../screens/CreateMatchScreen";
+import MatchListScreen from "@/screens/MatchListScreen";
+import SelectInitialServeScreen from "@/screens/SelectInitialServeScreen";
+import ScoreBoardScreen from "@/screens/ScoreBoardScreen";
+import CreateMatchScreen from "@/screens/CreateMatchScreen";
 
 const Stack = createNativeStackNavigator();
 

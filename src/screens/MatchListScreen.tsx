@@ -4,7 +4,6 @@ import {
   Text,
   FlatList,
   Pressable,
-  StyleSheet,
   TextInput,
 } from "react-native";
 import { listenMatches } from "../services/matchService";
@@ -13,8 +12,9 @@ import { Swipeable } from "react-native-gesture-handler";
 import { deleteMatch } from "../services/matchService";
 import { Alert } from "react-native";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Feather from '@expo/vector-icons/Feather';
+import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
 
-// Generate or retrieve device ID
 const getDeviceId = async (): Promise<string> => {
   try {
     let deviceId = await AsyncStorage.getItem('deviceId');
@@ -40,7 +40,6 @@ export default function MatchListScreen({ navigation }: any) {
   }, []);
 
   useEffect(() => {
-    // Load device ID
     getDeviceId().then(setDeviceId);
   }, []);
 
@@ -56,7 +55,6 @@ export default function MatchListScreen({ navigation }: any) {
     return allPlayerNames.some(name => name.includes(query)) || 
            match.name.toLowerCase().includes(query);
   }).sort((a, b) => {
-    // Sort by createdAt descending (newest first)
     const timeA = a.createdAt || 0;
     const timeB = b.createdAt || 0;
     return timeB - timeA;
@@ -73,9 +71,7 @@ export default function MatchListScreen({ navigation }: any) {
       return;
     }
 
-    // Check if match is locked by another device
     if (match.activeDeviceId && match.activeDeviceId !== deviceId) {
-      // Check if lock is stale (older than 5 minutes)
       const lockAge = Date.now() - (match.lockedAt || 0);
       const fiveMinutes = 5 * 60 * 1000;
       
@@ -95,26 +91,36 @@ export default function MatchListScreen({ navigation }: any) {
   };
 
   const renderTeams = (match: Match) => {
-    const teamA = match.teamA.players
-      .map((p) => p.name)
-      .filter(Boolean)
-      .join(" / ");
-
-    const teamB = match.teamB.players
-      .map((p) => p.name)
-      .filter(Boolean)
-      .join(" / ");
-
+    const isFinished = match.status === "finished";
+    const isTeamAWinner = isFinished && match.winner === "A";
+    const isTeamBWinner = isFinished && match.winner === "B";
+    
     return (
-      <Text style={styles.teams}>
-        <Text style={styles.teamA}>
-          A: {teamA}
-        </Text>
-        {"  "}vs{"  "}
-        <Text style={styles.teamB}>
-          B: {teamB}
-        </Text>
-      </Text>
+      <View className="my-2">
+        <View className="flex-row border-b border-gray-300 pb-1 mb-2">
+          <Text className={`flex-1 font-bold text-center ${isTeamAWinner ? "text-red-500" : "text-gray-700"}`}>
+            Đội A {match.status === "finished" && match.finalScore ? `(${match.finalScore.A})` : ""}
+          </Text>
+          <Text className={`flex-1 font-bold text-center ${isTeamBWinner ? "text-red-500" : "text-gray-700"}`}>
+            Đội B {match.status === "finished" && match.finalScore ? `(${match.finalScore.B})` : ""}
+          </Text>
+        </View>
+        
+        {Array.from({ length: Math.max(match.teamA.players.length, match.teamB.players.length) }).map((_, index) => (
+          <View key={index} className="flex-row py-1.5 border-b border-gray-100">
+            <View className="flex-1 px-2">
+              <Text className={`font-semibold text-center ${isTeamAWinner ? "text-red-500" : ""}`}>
+                {match.teamA.players[index]?.name || "-"}
+              </Text>
+            </View>
+            <View className="flex-1 px-2">
+              <Text className={`font-semibold text-center ${isTeamBWinner ? "text-red-500" : ""}`}>
+                {match.teamB.players[index]?.name || "-"}
+              </Text>
+            </View>
+          </View>
+        ))}
+      </View>
     );
   };
 
@@ -134,20 +140,20 @@ export default function MatchListScreen({ navigation }: any) {
           ]
         )
       }
-      style={styles.deleteBtn}
+      className="bg-red-600 justify-center items-center w-20 mt-3 rounded-xl h-full"
     >
-      <Text style={styles.deleteText}>Xoá</Text>
+      <Text className="text-white font-bold"><FontAwesome6 name="trash-can" size={24} color="white" /></Text>
     </Pressable>
   );
 
 
 
   return (
-    <View style={styles.container}>
-      <View style={styles.searchContainer}>
-        <Text style={styles.searchIcon}>🔍</Text>
+    <View className="flex-1 bg-gray-50">
+      <View className="flex-row items-center bg-white mx-4 mt-3 mb-1 px-3 py-2 rounded-xl border border-gray-200 shadow-sm">
+        <Text className="text-lg mr-2">🔍</Text>
         <TextInput
-          style={styles.searchInput}
+          className="flex-1 text-base text-gray-700 py-1"
           placeholder="Tìm kiếm theo tên VDV hoặc tên trận"
           placeholderTextColor="#9ca3af"
           value={searchQuery}
@@ -156,20 +162,24 @@ export default function MatchListScreen({ navigation }: any) {
           autoCorrect={false}
         />
         {searchQuery.length > 0 && (
-          <Pressable onPress={() => setSearchQuery("")} style={styles.clearBtn}>
-            <Text style={styles.clearText}>✕</Text>
+          <Pressable onPress={() => setSearchQuery("")} className="p-1 ml-1">
+            <Text className="text-lg text-gray-400 font-semibold">✕</Text>
           </Pressable>
         )}
       </View>
       <FlatList
         data={filteredMatches}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingBottom: 120 }}
-        renderItem={({ item }) => (
+        keyExtractor={(item: Match) => item.id}
+        contentContainerClassName="pb-30"
+        renderItem={({ item }: { item: Match }) => {
+          const isLocked = item.activeDeviceId && item.activeDeviceId !== deviceId;
+          const canDelete = item.status === "created" && !isLocked;
+          
+          return (
           <Swipeable
-            enabled={item.status === "created"}
+            enabled={canDelete}
             renderRightActions={() =>
-              item.status === "created"
+              canDelete
                 ? renderRightActions(item.id)
                 : null
             }
@@ -177,53 +187,35 @@ export default function MatchListScreen({ navigation }: any) {
           <Pressable
             onPress={() => openMatch(item)}
             android_ripple={{ color: "#e5e7eb" }}
-            style={styles.pressable}
+            className="mx-4 mt-3 rounded-xl overflow-hidden"
             disabled={item.status === "finished"}
           >
-            <View style={[
-              styles.card,
-              item.status === "finished" && styles.completedCard
-            ]}>
-              <View style={styles.nameRow}>
-                <Text style={styles.name}>{item.name}</Text>
+            <View className={`bg-white p-4 rounded-xl border border-gray-200 ${item.status === "finished" ? "bg-gray-100 opacity-85" : ""}`}>
+              <View className="items-center mb-1.5 relative">
+                <Text className="font-semibold text-[16px] text-green-700 mb-4">{item.name}</Text>
                 {item.activeDeviceId && deviceId && item.activeDeviceId !== deviceId && (
-                  <Text style={styles.lockIcon}>🔒</Text>
+                  <Feather name="lock" size={24} color="red"/>
                 )}
               </View>
-
               {renderTeams(item)}
-
-              <View style={styles.metaRow}>
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>
+              <View className="flex-row items-center gap-2.5 mt-4">
+                <View className="bg-green-700 px-2.5 py-1 rounded-full">
+                  <Text className="text-white text-xs font-bold">
                     {item.type === "single" ? "ĐƠN" : "ĐÔI"}
                   </Text>
                 </View>
 
-                <Text style={styles.metaText}>
+                <Text className="text-sm text-gray-500">
                   {item.pointsPerSet} điểm / set
                 </Text>
               </View>
-
-              {item.status === "finished" && item.finalScore && (
-                <View style={styles.finishedContainer}>
-                  <Text style={styles.finishedLabel}>🏆 Kết quả:</Text>
-                  <Text style={styles.finishedScore}>
-                    Đội A: {item.finalScore.A} - Đội B: {item.finalScore.B}
-                  </Text>
-                  <Text style={styles.winner}>
-                    Thắng: Đội {item.winner}
-                  </Text>
-                </View>
-              )}
             </View>
           </Pressable>
         </Swipeable>
-          
-
-        )}
+          );
+        }}
         ListEmptyComponent={
-          <Text style={styles.empty}>
+          <Text className="text-center mt-15 text-gray-500 text-base">
             {searchQuery.trim() 
               ? `Không tìm thấy trận đấu nào với "${searchQuery}"`
               : "Chưa có trận đấu"}
@@ -231,200 +223,11 @@ export default function MatchListScreen({ navigation }: any) {
         }
       />
       <Pressable
-        style={styles.fab}
+        className="absolute right-5 bottom-7 bg-green-700 w-[32px] h-[32px] rounded-full items-center justify-center shadow-lg"
         onPress={() => navigation.navigate("CreateMatch")}
       >
-        <Text style={styles.fabText}>＋</Text>
+        <Text className="text-white text-3xl -mt-0.5">＋</Text>
       </Pressable>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f9fafb",
-  },
-  searchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  searchIcon: {
-    fontSize: 18,
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: "#374151",
-    paddingVertical: 4,
-  },
-  clearBtn: {
-    padding: 4,
-    marginLeft: 4,
-  },
-  clearText: {
-    fontSize: 18,
-    color: "#9ca3af",
-    fontWeight: "600",
-  },
-  pressable: {
-    marginHorizontal: 16,
-    marginTop: 12,
-    borderRadius: 12,
-    overflow: "hidden",
-  },
-
-  card: {
-    backgroundColor: "#fff",
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-  },
-
-  nameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 6,
-  },
-
-  name: {
-    fontSize: 18,
-    fontWeight: "700",
-    flex: 1,
-  },
-
-  lockIcon: {
-    fontSize: 18,
-    marginLeft: 8,
-  },
-
-  teams: {
-    fontSize: 15,
-    color: "#374151",
-    marginBottom: 8,
-  },
-
-  teamA: {
-    color: "#1d4ed8",
-    fontWeight: "600",
-  },
-
-  teamB: {
-    color: "#b91c1c",
-    fontWeight: "600",
-  },
-
-  metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-
-  badge: {
-    backgroundColor: "#15803d",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-  },
-
-  badgeText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-
-  metaText: {
-    fontSize: 14,
-    color: "#6b7280",
-  },
-
-  empty: {
-    textAlign: "center",
-    marginTop: 60,
-    color: "#6b7280",
-    fontSize: 16,
-  },
-
-  fab: {
-    position: "absolute",
-    right: 20,
-    bottom: 30,
-    backgroundColor: "#15803d",
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    alignItems: "center",
-    justifyContent: "center",
-    elevation: 5,
-  },
-
-  fabText: {
-    color: "#fff",
-    fontSize: 30,
-    marginTop: -2,
-  },
-
-  deleteBtn: {
-    backgroundColor: "#dc2626",
-    justifyContent: "center",
-    alignItems: "center",
-    width: 80,
-    marginTop: 12,
-    borderRadius: 12,
-  },
-
-  deleteText: {
-    color: "#fff",
-    fontWeight: "700",
-  },
-
-  completedCard: {
-    backgroundColor: "#f3f4f6",
-    opacity: 0.85,
-  },
-
-  finishedContainer: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#e5e7eb",
-  },
-
-  finishedLabel: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#15803d",
-    marginBottom: 4,
-  },
-
-  finishedScore: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#374151",
-    marginBottom: 2,
-  },
-
-  winner: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#15803d",
-  },
-
-});
